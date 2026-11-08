@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduPlan Uruguay + IA - Portal Docente & Institucional</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+        }
+        .dark .glass {
+            background: rgba(15, 23, 42, 0.85);
+        }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 9999px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white !important; color: black !important; }
+            .print-card { border: 1px solid #ddd !important; box-shadow: none !important; margin-bottom: 1rem; page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-full flex flex-col transition-colors duration-300">
+
+    <!-- LOGIN / AUTH MODAL OVERLAY (Initial Screen if not logged in) -->
+    <div id="authScreen" class="fixed inset-0 z-50 bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 w-full max-w-xl rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col">
+            <!-- Header Tabs -->
+            <div class="flex border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                <button onclick="switchAuthTab('login')" id="tabAuthLogin" class="flex-1 py-3 text-xs font-bold text-brand-600 border-b-2 border-brand-600">Iniciar Sesión</button>
+                <button onclick="switchAuthTab('code')" id="tabAuthCode" class="flex-1 py-3 text-xs font-bold text-slate-400 hover:text-slate-600 border-b-2 border-transparent">Acceso Alumno/Padre (Código)</button>
+                <button onclick="switchAuthTab('register')" id="tabAuthRegister" class="flex-1 py-3 text-xs font-bold text-slate-400 hover:text-slate-600 border-b-2 border-transparent">Registrarse</button>
+            </div>
+
+            <!-- Login Form -->
+            <div id="authLoginForm" class="p-6 space-y-4">
+                <div class="text-center space-y-1">
+                    <div class="inline-flex p-3 rounded-2xl bg-gradient-to-tr from-brand-500 to-indigo-600 text-white shadow-lg mb-1">
+                        <i class="fa-solid fa-graduation-cap text-2xl"></i>
+                    </div>
+                    <h2 class="text-xl font-extrabold">EduPlan Uruguay</h2>
+                    <p class="text-xs text-slate-400">Acceso a Plataforma Educativa & Asistente IA</p>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[11px] font-bold text-slate-500 uppercase">Cédula o Correo Electrónico</label>
+                        <input type="text" id="loginUser" placeholder="Ej: 5137450 o correo@ceibal.edu.uy" class="w-full mt-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-bold text-slate-500 uppercase">Contraseña</label>
+                        <input type="password" id="loginPass" placeholder="••••••••" class="w-full mt-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-brand-500 outline-none">
+                    </div>
+                    <div class="flex items-center justify-between text-xs">
+                        <button onclick="openForgotModal()" class="text-brand-600 hover:underline font-medium">¿Olvidaste tu contraseña?</button>
+                    </div>
+                    <button onclick="processLogin()" class="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-xs shadow-lg shadow-brand-500/30 transition">
+                        Ingresar al Portal
+                    </button>
+                </div>
+
+                <div class="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800/60 text-[11px] text-amber-800 dark:text-amber-200 space-y-1">
+                    <span class="font-bold"><i class="fa-solid fa-user-shield"></i> Credenciales de Administración Pre-configuradas:</span>
+                    <div>Usuario / Cédula: <code class="font-mono bg-white dark:bg-slate-900 px-1 rounded">5137450</code> | Clave: <code class="font-mono bg-white dark:bg-slate-900 px-1 rounded">51371450</code></div>
+                    <div class="text-[10px] text-amber-600 dark:text-amber-400 font-medium">(Acceso SuperDocente Administrator: Prof. Admi. David)</div>
+                </div>
+            </div>
+
+            <!-- Code Entrance (Student / Parent) -->
+            <div id="authCodeForm" class="p-6 space-y-4 hidden">
+                <div class="text-center space-y-1">
+                    <h3 class="font-bold text-base">Acceso con Código de Clase</h3>
+                    <p class="text-xs text-slate-400">Ingresa el código proporcionado por tu docente para ver actividades y notas.</p>
+                </div>
+                <div class="space-y-3">
+                    <input type="text" id="classCodeInput" uppercase placeholder="Ej: EDU-9482" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-3 text-center tracking-widest text-lg font-mono font-bold uppercase focus:ring-2 focus:ring-brand-500 outline-none">
+                    <button onclick="loginWithCode()" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow transition">
+                        Ver Mis Actividades y Notas
+                    </button>
+                </div>
+            </div>
+
+            <!-- Registration Form Accordion -->
+            <div id="authRegisterForm" class="p-6 space-y-4 hidden max-h-[70vh] overflow-y-auto">
+                <h3 class="font-bold text-sm text-center">Registro de Usuario Nuevo</h3>
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[11px] font-bold text-slate-500">Tipo de Perfil</label>
+                        <select id="regType" onchange="toggleRegFields()" class="w-full mt-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+                            <option value="docente">👩‍🏫 Docente / Profesor(a)</option>
+                            <option value="estudiante">🎓 Estudiante / Alumno(a)</option>
+                            <option value="padre">👨‍👩‍👧 Padre / Tutor Responsable</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="regName" placeholder="Nombre" class="bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+                        <input type="text" id="regSurname" placeholder="Apellido" class="bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="regCI" placeholder="Cédula de Identidad" class="bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+                        <input type="number" id="regAge" placeholder="Edad" class="bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+                    </div>
+                    <input type="email" id="regEmail" placeholder="Correo Electrónico" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+                    <input type="password" id="regPass" placeholder="Crear Contraseña" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+                    
+                    <div id="padreFields" class="hidden space-y-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                        <label class="text-[11px] font-bold text-brand-600">Datos del Alumno a cargo</label>
+                        <input type="text" id="regStudentChild" placeholder="Nombre completo del hijo/alumno" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+                    </div>
+
+                    <button onclick="processRegister()" class="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-xs shadow transition">
+                        Completar Registro
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FORGOT PASSWORD MODAL -->
+    <div id="forgotModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-white dark:bg-slate-800 max-w-md w-full rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-4">
+            <h3 class="font-bold text-base">Recuperar Contraseña</h3>
+            <p class="text-xs text-slate-500">Ingresa tu Cédula o Correo Electrónico. Te enviaremos un código de restauración simulado.</p>
+            <input type="text" id="recoveryInput" placeholder="Cédula o Correo" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+            <div class="flex justify-end gap-2">
+                <button onclick="closeForgotModal()" class="px-4 py-2 text-xs text-slate-400">Cancelar</button>
+                <button onclick="submitRecovery()" class="px-4 py-2 bg-brand-600 text-white text-xs font-bold rounded-xl">Enviar Enlace</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Navigation Bar -->
+    <header class="sticky top-0 z-40 w-full glass border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <button id="mobileMenuBtn" class="lg:hidden p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+                <i class="fa-solid fa-bars text-xl"></i>
+            </button>
+            <div class="flex items-center gap-2">
+                <div class="bg-gradient-to-tr from-brand-600 to-indigo-600 text-white p-2 rounded-xl shadow-lg shadow-brand-500/30">
+                    <i class="fa-solid fa-graduation-cap text-xl"></i>
+                </div>
+                <span class="font-extrabold text-lg md:text-xl tracking-tight bg-gradient-to-r from-brand-600 to-indigo-600 bg-clip-text text-transparent">EduPlan <span class="text-xs px-2 py-0.5 rounded-full bg-brand-100 dark:bg-brand-900/60 text-brand-700 dark:text-brand-300 font-semibold uppercase">Uruguay EBI/EMS</span></span>
+            </div>
+        </div>
+
+        <!-- Clock & Date Display -->
+        <div class="hidden md:flex items-center gap-4 px-4 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+            <div class="flex items-center gap-2 text-xs font-bold text-brand-600 dark:text-brand-400">
+                <i class="fa-regular fa-clock"></i>
+                <span id="headerClock">00:00:00</span>
+            </div>
+            <div class="h-3 w-px bg-slate-300 dark:bg-slate-700"></div>
+            <div class="text-xs text-slate-500 dark:text-slate-400 font-medium" id="headerDate">--/--/----</div>
+        </div>
+
+        <!-- User Badge & Actions -->
+        <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                <div class="w-6 h-6 rounded-full bg-brand-600 text-white flex items-center justify-center font-bold text-[10px]" id="navAvatar">
+                    AD
+                </div>
+                <div class="text-left hidden sm:block">
+                    <div class="text-xs font-bold leading-none" id="navName">Prof. Admi. David</div>
+                    <div class="text-[10px] text-emerald-600 dark:text-emerald-400 leading-none font-semibold" id="navRole">Super Admin</div>
+                </div>
+            </div>
+
+            <button onclick="logout()" title="Cerrar Sesión" class="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-xl transition">
+                <i class="fa-solid fa-power-off text-sm"></i>
+            </button>
+
+            <!-- Dark Mode Toggle -->
+            <button id="themeToggle" class="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition">
+                <i class="fa-solid fa-moon dark:hidden"></i>
+                <i class="fa-solid fa-sun hidden dark:block text-amber-400"></i>
+            </button>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+        <!-- Sidebar Navigation -->
+        <aside id="sidebar" class="fixed lg:static inset-y-0 left-0 z-30 w-64 bg-white dark:bg-slate-800/90 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between transform -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out">
+            <div class="p-4 space-y-1 overflow-y-auto">
+                <div class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-3 mb-2">Módulos del Sistema</div>
+                
+                <button onclick="switchTab('planificacion')" class="nav-btn docente-only w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition active-tab bg-brand-50 text-brand-600 dark:bg-brand-950/50 dark:text-brand-400" data-tab="planificacion">
+                    <i class="fa-solid fa-wand-magic-sparkles text-lg w-5 text-brand-500"></i>
+                    <span>Planificación IA Pautas</span>
+                </button>
+
+                <button onclick="switchTab('seguimiento')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition" data-tab="seguimiento">
+                    <i class="fa-solid fa-chart-user text-lg w-5 text-indigo-500"></i>
+                    <span>Seguimiento de Chicos</span>
+                </button>
+
+                <button onclick="switchTab('accesos')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition" data-tab="accesos">
+                    <i class="fa-solid fa-bookmark text-lg w-5 text-amber-500"></i>
+                    <span>CFE, CREA & Plataformas</span>
+                </button>
+
+                <button onclick="switchTab('carpetas')" class="nav-btn docente-only w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition" data-tab="carpetas">
+                    <i class="fa-solid fa-folder-open text-lg w-5 text-teal-500"></i>
+                    <span>Mis Grupos & Código</span>
+                </button>
+
+                <button onclick="switchTab('agenda')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition" data-tab="agenda">
+                    <i class="fa-solid fa-calendar-check text-lg w-5 text-emerald-500"></i>
+                    <span>Agenda & Notificaciones</span>
+                </button>
+
+                <button onclick="switchTab('editor')" class="nav-btn docente-only w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition" data-tab="editor">
+                    <i class="fa-solid fa-file-pen text-lg w-5 text-purple-500"></i>
+                    <span>Borrador & Redactor</span>
+                </button>
+
+                <button onclick="switchTab('foro')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition" data-tab="foro">
+                    <i class="fa-solid fa-comments text-lg w-5 text-rose-500"></i>
+                    <span>Foro & Avisos</span>
+                </button>
+
+                <button id="navAdminBtn" onclick="switchTab('admin')" class="nav-btn hidden w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 transition" data-tab="admin">
+                    <i class="fa-solid fa-user-gear text-lg w-5 text-amber-500"></i>
+                    <span>Panel SuperAdmin</span>
+                </button>
+
+                <div class="pt-4 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-3 mb-2">Despliegue</div>
+                <button onclick="switchTab('hosting')" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition" data-tab="hosting">
+                    <i class="fa-solid fa-cloud-arrow-up text-lg w-5 text-sky-500"></i>
+                    <span>GitHub Pages & Dominio</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+
+            <!-- TAB 1: PLANIFICACIÓN DOCENTE CON PAUTAS URUGUAYAS -->
+            <section id="tab-planificacion" class="space-y-6">
+                <div class="bg-gradient-to-r from-brand-600 via-indigo-600 to-purple-700 p-6 rounded-3xl text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <span class="px-3 py-1 bg-white/20 backdrop-blur rounded-full text-[10px] font-extrabold uppercase tracking-widest">Adaptado al marco Curricular ANEP / CFE</span>
+                        <h1 class="text-2xl font-black mt-1">Generador de Planificaciones Didácticas</h1>
+                        <p class="text-xs text-brand-100 mt-1 max-w-xl">Crea planificaciones anuales, mensuales o de clase a clase respetando metas, competencias MNE y criterios de logros exigidos en Magisterio y Profesorado.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="exportPlanningPDF()" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow">
+                            <i class="fa-solid fa-print"></i> Vista Previa / Imprimir PDF
+                        </button>
+                    </div>
+                </div>
+
+                <!-- AI Generator Form with Uruguayan Educational Guidelines -->
+                <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+                        <h3 class="font-extrabold text-sm flex items-center gap-2">
+                            <i class="fa-solid fa-robot text-brand-500"></i> Parámetros de Planificación Docente
+                        </h3>
+                        <span class="text-xs text-slate-400">Gemini IA Integrado</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div>
+                            <label class="text-[11px] font-bold text-slate-500 uppercase">Modalidad de Planificación</label>
+                            <select id="planPeriod" class="w-full mt-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+                                <option value="Diaria / Clase a Clase">📌 Diaria / Clase a Clase</option>
+                                <option value="Mensual / Unidad">📅 Mensual / Unidad Didáctica</option>
+                                <option value="Anual / Marco Curricular">🗓️ Anual / Proyecto de Aula</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-bold text-slate-500 uppercase">Nivel / Subgrupo</label>
+                            <select id="planGrade" class="w-full mt-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+                                <option value="Primaria - EBI 1er Tramo (1° y 2°)">Primaria - EBI 1er Tramo (1° y 2°)</option>
+                                <option value="Primaria - EBI 2do Tramo (3° y 4°)">Primaria - EBI 2do Tramo (3° y 4°)</option>
+                                <option value="Primaria - EBI 3er Tramo (5° y 6°)">Primaria - EBI 3er Tramo (5° y 6°)</option>
+                                <option value="Secundaria / UTU - EMS (1° a 3° BD)">Secundaria / UTU - EMS (1° a 3° BD)</option>
+                                <option value="Formación Docente (Magisterio / IPA)">Formación Docente (Magisterio / IPA)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-bold text-slate-500 uppercase">Asignatura / Espacio</label>
+                            <input type="text" id="planSubject" placeholder="Ej: Ciencias de la Naturaleza, Lengua, Historia..." class="w-full mt-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-[11px] font-bold text-slate-500 uppercase">Contenido Temático / Eje Curricular</label>
+                        <input type="text" id="planTopic" placeholder="Ej: La biodiversidad del bioma pradera en Uruguay, la Revolución Artiguista, fracciones..." class="w-full mt-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button onclick="generateUruguayPlan()" id="btnGenPlan" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-lg transition">
+                            <i class="fa-solid fa-sparkles"></i> Generar Planificación con Pautas Pedagógicas
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Printable Live Planning Workspace -->
+                <div id="printablePlanArea" class="space-y-4">
+                    <div id="planningUnitsContainer" class="space-y-4">
+                        <!-- Dynamic Units inserted here -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: SEGUIMIENTO DE ACTIVIDADES DE ALUMNOS -->
+            <section id="tab-seguimiento" class="hidden space-y-6">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-xl font-bold">Seguimiento de Actividades y Alumnos</h2>
+                        <p class="text-xs text-slate-500">Visualiza el progreso de tareas enviadas, calificaciones y entregas de tus chicos.</p>
+                    </div>
+                    <button onclick="addStudentTask()" class="docente-only px-4 py-2 bg-brand-600 text-white text-xs font-bold rounded-xl shadow">
+                        <i class="fa-solid fa-plus"></i> Asignar Nueva Actividad
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
+                        <span class="text-[10px] font-bold uppercase text-slate-400">Total Alumnos Vinculados</span>
+                        <div class="text-2xl font-black text-brand-600 mt-1" id="statStudents">24</div>
+                    </div>
+                    <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
+                        <span class="text-[10px] font-bold uppercase text-slate-400">Actividades Entregadas</span>
+                        <div class="text-2xl font-black text-emerald-600 mt-1" id="statTasks">18 / 24</div>
+                    </div>
+                    <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
+                        <span class="text-[10px] font-bold uppercase text-slate-400">Promedio General</span>
+                        <div class="text-2xl font-black text-purple-600 mt-1">9.2 / 12</div>
+                    </div>
+                </div>
+
+                <!-- Student List & Submissions Table -->
+                <div class="bg-white dark:bg-slate-800 rounded-3xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm overflow-x-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead>
+                            <tr class="border-b border-slate-200 dark:border-slate-700 text-slate-400 uppercase text-[10px]">
+                                <th class="pb-3 font-bold">Estudiante</th>
+                                <th class="pb-3 font-bold">Clase / Grupo</th>
+                                <th class="pb-3 font-bold">Última Tarea</th>
+                                <th class="pb-3 font-bold">Estado de Entrega</th>
+                                <th class="pb-3 font-bold">Calificación</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentTableBody" class="divide-y divide-slate-100 dark:divide-slate-700/50">
+                            <!-- Dynamic Student rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- TAB 3: ACCESOS DIRECTOS CFE, CREA, CANVA, CEIBAL -->
+            <section id="tab-accesos" class="hidden space-y-6">
+                <div>
+                    <h2 class="text-xl font-bold">Plataformas Educativas & Portales Uruguay</h2>
+                    <p class="text-xs text-slate-500">Accesos institucionales directos para docentes y estudiantes.</p>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <a href="https://crea.ceibal.edu.uy" target="_blank" class="p-5 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition flex flex-col items-center text-center space-y-3 group">
+                        <div class="w-12 h-12 rounded-2xl bg-sky-500 text-white flex items-center justify-center text-xl group-hover:scale-110 transition">
+                            <i class="fa-solid fa-laptop-code"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-xs">CREA Ceibal</h4>
+                            <p class="text-[10px] text-slate-400">Plataforma Schoology ANEP</p>
+                        </div>
+                    </a>
+
+                    <a href="https://www.cfe.edu.uy" target="_blank" class="p-5 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition flex flex-col items-center text-center space-y-3 group">
+                        <div class="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center text-xl group-hover:scale-110 transition">
+                            <i class="fa-solid fa-university"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-xs">CFE Uruguay</h4>
+                            <p class="text-[10px] text-slate-400">SGA / Magisterio / IPA</p>
+                        </div>
+                    </a>
+
+                    <a href="https://www.canva.com" target="_blank" class="p-5 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition flex flex-col items-center text-center space-y-3 group">
+                        <div class="w-12 h-12 rounded-2xl bg-teal-500 text-white flex items-center justify-center text-xl group-hover:scale-110 transition">
+                            <i class="fa-solid fa-palette"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-xs">CANVA Education</h4>
+                            <p class="text-[10px] text-slate-400">Diseño para Aulas</p>
+                        </div>
+                    </a>
+
+                    <a href="https://ceibal.edu.uy" target="_blank" class="p-5 bg-white dark:bg-slate-800 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition flex flex-col items-center text-center space-y-3 group">
+                        <div class="w-12 h-12 rounded-2xl bg-rose-500 text-white flex items-center justify-center text-xl group-hover:scale-110 transition">
+                            <i class="fa-solid fa-globe"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-xs">Portal Ceibal</h4>
+                            <p class="text-[10px] text-slate-400">Recursos & Biblioteca PAM</p>
+                        </div>
+                    </a>
+                </div>
+            </section>
+
+            <!-- TAB 4: MIS GRUPOS & GENERADOR DE CÓDIGO ÚNICO -->
+            <section id="tab-carpetas" class="hidden space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold">Gestión de Clases & Códigos Únicos</h2>
+                        <p class="text-xs text-slate-500">Genera códigos de acceso aleatorios para que padres y alumnos entren sin contraseña.</p>
+                    </div>
+                    <button onclick="openFolderModal()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow">
+                        <i class="fa-solid fa-folder-plus"></i> Crear Nueva Clase
+                    </button>
+                </div>
+
+                <div id="foldersGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Dynamic class folders -->
+                </div>
+            </section>
+
+            <!-- TAB 5: AGENDA, CALENDARIO & NOTIFICACIONES -->
+            <section id="tab-agenda" class="hidden space-y-6">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="space-y-6">
+                        <!-- Digital Clock -->
+                        <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-3xl p-6 shadow-xl space-y-4 border border-slate-700">
+                            <div class="flex items-center justify-between text-xs text-slate-400 font-mono">
+                                <span>HORARIO URUGUAY</span>
+                                <i class="fa-solid fa-clock"></i>
+                            </div>
+                            <div class="text-center py-4">
+                                <div id="widgetTime" class="text-4xl md:text-5xl font-black tracking-widest font-mono text-brand-400">00:00:00</div>
+                                <div id="widgetDate" class="text-xs text-slate-400 mt-2 font-medium">Cargando fecha...</div>
+                            </div>
+                        </div>
+
+                        <!-- Agenda Form with exact Date Selection -->
+                        <div class="bg-white dark:bg-slate-800 rounded-3xl p-5 shadow-sm border border-slate-200 dark:border-slate-700 space-y-4">
+                            <h3 class="text-sm font-bold flex items-center gap-2">
+                                <i class="fa-solid fa-calendar-plus text-emerald-500"></i> Nuevo Recordatorio o Evento
+                            </h3>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="text-[11px] font-bold text-slate-500">Título del Evento / Medicación</label>
+                                    <input type="text" id="eventTitle" placeholder="Ej: Examen Historia o Tomar Antibiótico" class="w-full mt-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="text-[11px] font-bold text-slate-500">Fecha de Término</label>
+                                        <input type="date" id="eventDate" class="w-full mt-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+                                    </div>
+                                    <div>
+                                        <label class="text-[11px] font-bold text-slate-500">Hora</label>
+                                        <input type="time" id="eventTime" class="w-full mt-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="text-[11px] font-bold text-slate-500">Categoría</label>
+                                    <select id="eventType" class="w-full mt-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+                                        <option value="Academico">📚 Académico / Examen</option>
+                                        <option value="Salud">💊 Salud / Toma de Medicación</option>
+                                        <option value="Personal">⭐ Personal / Reunión</option>
+                                    </select>
+                                </div>
+                                <button onclick="addAgendaEvent()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs shadow transition">
+                                    Guardar con Alerta Programada
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="lg:col-span-2 bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 space-y-4">
+                        <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+                            <h3 class="text-base font-bold flex items-center gap-2">
+                                <i class="fa-solid fa-list-check text-brand-500"></i> Eventos Próximos & Recordatorios
+                            </h3>
+                            <button onclick="requestNotificationPermission()" class="text-xs bg-brand-50 text-brand-600 px-3 py-1 rounded-full font-bold">Activar Alertas</button>
+                        </div>
+                        <div id="agendaList" class="space-y-3 min-h-[300px]"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 6: BORRADOR Y REDACTOR -->
+            <section id="tab-editor" class="hidden space-y-6">
+                <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 space-y-4">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                            <h2 class="text-xl font-bold">Redactor de Informes & Textos</h2>
+                            <p class="text-xs text-slate-500">Guarda documentos en formato local .TXT o exporta en PDF.</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="aiEnhanceDraft()" class="px-3 py-2 bg-purple-600 text-white text-xs font-bold rounded-xl shadow"><i class="fa-solid fa-wand-magic"></i> Optimizar con IA</button>
+                            <button onclick="exportDraftTXT()" class="px-3 py-2 bg-slate-700 text-white text-xs font-bold rounded-xl shadow"><i class="fa-solid fa-download"></i> Descargar .TXT</button>
+                        </div>
+                    </div>
+                    <input type="text" id="draftTitle" placeholder="Título del informe..." class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-4 py-2 text-sm font-bold outline-none">
+                    <textarea id="draftBody" rows="12" placeholder="Redacta las notas institucionales, observaciones o informes..." class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-4 text-xs leading-relaxed outline-none resize-none"></textarea>
+                </div>
+            </section>
+
+            <!-- TAB 7: FORO & COMUNIDAD -->
+            <section id="tab-foro" class="hidden space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold">Foro Institucional & Novedades</h2>
+                        <p class="text-xs text-slate-500">Publicaciones y carteleras compartidas.</p>
+                    </div>
+                    <button onclick="openForumModal()" class="docente-only px-4 py-2 bg-rose-600 text-white text-xs font-bold rounded-xl shadow">
+                        <i class="fa-solid fa-pen-to-square"></i> Nueva Publicación
+                    </button>
+                </div>
+                <div id="forumPostsContainer" class="space-y-4"></div>
+            </section>
+
+            <!-- TAB 8: SUPER ADMIN DASHBOARD (DAVID) -->
+            <section id="tab-admin" class="hidden space-y-6">
+                <div class="bg-gradient-to-r from-amber-500 to-orange-600 p-6 rounded-3xl text-white shadow-xl">
+                    <h2 class="text-2xl font-black">Panel de Administración General</h2>
+                    <p class="text-xs text-amber-100 mt-1">Sesión iniciada como SuperAdmin (Prof. Admi. David). Control de usuarios y estadísticas del servidor.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">Docentes Registrados</span>
+                        <div class="text-2xl font-black text-amber-500 mt-1" id="adminCountDocentes">1</div>
+                    </div>
+                    <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">Estudiantes / Padres</span>
+                        <div class="text-2xl font-black text-indigo-500 mt-1" id="adminCountUsers">24</div>
+                    </div>
+                    <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">Códigos Únicos Activos</span>
+                        <div class="text-2xl font-black text-emerald-500 mt-1" id="adminCountCodes">2</div>
+                    </div>
+                    <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">Estado del Sistema</span>
+                        <div class="text-2xl font-black text-emerald-500 mt-1">100% Online</div>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-slate-800 rounded-3xl p-5 border border-slate-200 dark:border-slate-700">
+                    <h3 class="font-bold text-sm mb-3">Usuarios Registrados en la Plataforma</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead>
+                                <tr class="border-b border-slate-200 dark:border-slate-700 text-slate-400">
+                                    <th class="pb-2">Cédula / Usuario</th>
+                                    <th class="pb-2">Nombre Completo</th>
+                                    <th class="pb-2">Rol</th>
+                                    <th class="pb-2">Email</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adminUsersTable" class="divide-y divide-slate-100 dark:divide-slate-700/40">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 9: GUIA COMPRA DOMINIO & GITHUB PAGES -->
+            <section id="tab-hosting" class="hidden space-y-6">
+                <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 md:p-8 border border-slate-200 dark:border-slate-700 space-y-6">
+                    <div class="space-y-1">
+                        <span class="px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full text-[10px] font-bold uppercase">Tu Presupuesto: $10 USD con Tarjeta Mi Dinero</span>
+                        <h2 class="text-2xl font-bold">Cómo Subir esta Web a Internet GRATIS con Tu Dominio</h2>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+                            <h3 class="font-bold text-sm text-brand-600">Paso 1: Alojar GRATIS en GitHub Pages ($0 USD)</h3>
+                            <ol class="list-decimal list-inside text-xs text-slate-600 dark:text-slate-300 space-y-2">
+                                <li>Crea una cuenta gratuita en <strong>GitHub.com</strong>.</li>
+                                <li>Crea un repositorio público llamado <code class="bg-slate-200 dark:bg-slate-800 px-1 rounded font-mono">eduplan-uruguay</code>.</li>
+                                <li>Sube este archivo guardándolo con el nombre exacto <strong>index.html</strong>.</li>
+                                <li>Ve a <em>Settings -> Pages</em> en tu repositorio y selecciona la rama <strong>main</strong>. ¡En 1 minuto tu web estará online!</li>
+                            </ol>
+                        </div>
+
+                        <div class="p-5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
+                            <h3 class="font-bold text-sm text-emerald-600">Paso 2: Comprar Dominio con Mi Dinero</h3>
+                            <ol class="list-decimal list-inside text-xs text-slate-600 dark:text-slate-300 space-y-2">
+                                <li>Ingresa a <strong>Namecheap.com</strong> o <strong>NameSilo.com</strong>.</li>
+                                <li>Busca tu nombre deseado (Ej: <code class="bg-slate-200 dark:bg-slate-800 px-1 rounded">mi-escuela.com</code>). Cuestan entre $6 y $9 USD al año.</li>
+                                <li>Paga directamente con tu tarjeta internacional <strong>Mi Dinero / Prex / Oca Blue</strong> de Uruguay.</li>
+                                <li>En los ajustes DNS del dominio, vincúlalo a GitHub Pages indicando la URL de tu repositorio.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- MODAL: FORO -->
+    <div id="forumModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <h3 class="font-bold text-base">Crear Aviso o Tarea en el Foro</h3>
+            <input type="text" id="postTitle" placeholder="Título..." class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+            <textarea id="postContent" rows="4" placeholder="Escribe aquí el comunicado..." class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-3 text-xs outline-none resize-none"></textarea>
+            <div class="flex justify-end gap-2">
+                <button onclick="closeForumModal()" class="px-4 py-2 text-xs text-slate-400">Cancelar</button>
+                <button onclick="submitForumPost()" class="px-4 py-2 bg-rose-600 text-white text-xs font-bold rounded-xl">Publicar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CREAR CLASE -->
+    <div id="folderModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl space-y-4">
+            <h3 class="font-bold text-base">Crear Clase y Generar Código</h3>
+            <input type="text" id="folderName" placeholder="Ej: 5° Año Primaria - Biología" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-xs outline-none">
+            <div class="flex justify-end gap-2">
+                <button onclick="closeFolderModal()" class="px-4 py-2 text-xs text-slate-400">Cancelar</button>
+                <button onclick="saveFolder()" class="px-4 py-2 bg-brand-600 text-white text-xs font-bold rounded-xl">Crear Clase</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toastContainer" class="fixed bottom-4 right-4 z-50 space-y-2 pointer-events-none"></div>
+
+    <script>
+        // GLOBAL APP STATE & DATABASE SIMULATION
+        let currentUser = null; // Currently logged user
+        let activeTab = 'planificacion';
+
+        let registeredUsers = [
+            { ci: '5137450', email: 'david@admin.edu.uy', pass: '51371450', name: 'David', surname: 'Prof. Admi.', role: 'admin', age: 35 },
+            { ci: '4589201', email: 'maria@escuela.edu.uy', pass: '123456', name: 'María', surname: 'Pérez', role: 'docente', age: 40 }
+        ];
+
+        let folders = [
+            { id: 1, name: "Escuela N° 4 - 5to Año", color: "bg-blue-500", code: "EDU-9482", students: 24 },
+            { id: 2, name: "Liceo 2 - Historia Uruguay", color: "bg-emerald-500", code: "HIST-301", students: 18 }
+        ];
+
+        let agendaEvents = [
+            { id: 1, title: "Entrega Planificación Anual CFE", date: "2026-11-20", time: "14:00", type: "Academico" },
+            { id: 2, title: "Tomar Paracetamol / Vitaminas", date: "2026-11-08", time: "20:00", type: "Salud" }
+        ];
+
+        let studentTasks = [
+            { name: "Joaquín Silva", class: "5to Año", task: "Lámina Pradera Autóctona", status: "Entregado", grade: "10/12" },
+            { name: "Lucía Méndez", class: "5to Año", task: "Lámina Pradera Autóctona", status: "Entregado", grade: "11/12" },
+            { name: "Mateo Rossi", class: "5to Año", task: "Lámina Pradera Autóctona", status: "Pendiente", grade: "-/12" }
+        ];
+
+        let planningUnits = [
+            {
+                id: 1,
+                title: "Unidad 1: Ecosistemas Autóctonos de Uruguay",
+                subject: "Ciencias Naturales - EBI",
+                period: "Mensual / Unidad",
+                objectives: "Comprender el bioma pradera e identificar especies nativas como el venado de las pampas y el ceibo.",
+                criteria: "Describe relaciones tróficas. Clasifica flora y fauna autóctona en el cuaderno Ceibal.",
+                activities: "1. Indagación previa.\n2. Uso de Ceibalitas para búsqueda en Uruguay Educa.\n3. Elaboración de informe en grupo.",
+                notes: "Recursos: CREA y láminas descargables."
+            }
+        ];
+
+        let forumPosts = [
+            { id: 1, author: "Prof. Admi. David", role: "Super Admin", title: "Bienvenidos al nuevo Portal EduPlan Uruguay", content: "Estimados docentes y familias: ya se encuentra disponible el generador con pautas ANEP/CFE y el acceso con código único.", date: "Hoy" }
+        ];
+
+        window.onload = function() {
+            startClock();
+            checkNearAgendaEvents();
+            setupThemeToggle();
+            setupSidebarToggle();
+            renderFolders();
+            renderAgenda();
+            renderStudentTable();
+            renderPlanningUnits();
+            renderForumPosts();
+            renderAdminUsers();
+        };
+
+        // AUTHENTICATION & LOGIN LOGIC
+        function switchAuthTab(tab) {
+            ['Login', 'Code', 'Register'].forEach(t => {
+                document.getElementById(`auth${t}Form`).classList.add('hidden');
+                document.getElementById(`tabAuth${t}`).className = 'flex-1 py-3 text-xs font-bold text-slate-400 hover:text-slate-600 border-b-2 border-transparent';
+            });
+            document.getElementById(`auth${tab.charAt(0).toUpperCase() + tab.slice(1)}Form`).classList.remove('hidden');
+            document.getElementById(`tabAuth${tab.charAt(0).toUpperCase() + tab.slice(1)}`).className = 'flex-1 py-3 text-xs font-bold text-brand-600 border-b-2 border-brand-600';
+        }
+
+        function processLogin() {
+            const userIn = document.getElementById('loginUser').value.trim();
+            const passIn = document.getElementById('loginPass').value.trim();
+
+            const found = registeredUsers.find(u => (u.ci === userIn || u.email === userIn) && u.pass === passIn);
+            if (found) {
+                currentUser = found;
+                document.getElementById('authScreen').classList.add('hidden');
+                updateUserUI();
+                showToast(`¡Bienvenido/a ${found.name} ${found.surname}!`);
+            } else {
+                showToast("Credenciales incorrectas. Verifica tu cédula/correo y contraseña.");
+            }
+        }
+
+        function loginWithCode() {
+            const code = document.getElementById('classCodeInput').value.trim().toUpperCase();
+            const folder = folders.find(f => f.code === code);
+            if (folder) {
+                currentUser = { name: 'Estudiante / Tutor', surname: `(Clase ${folder.name})`, role: 'estudiante', code: code };
+                document.getElementById('authScreen').classList.add('hidden');
+                updateUserUI();
+                switchTab('seguimiento');
+                showToast(`Acceso concedido a la clase: ${folder.name}`);
+            } else {
+                showToast("Código de clase no encontrado. Pide el código a tu docente.");
+            }
+        }
+
+        function toggleRegFields() {
+            const type = document.getElementById('regType').value;
+            if (type === 'padre') document.getElementById('padreFields').classList.remove('hidden');
+            else document.getElementById('padreFields').classList.add('hidden');
+        }
+
+        function processRegister() {
+            const name = document.getElementById('regName').value.trim();
+            const surname = document.getElementById('regSurname').value.trim();
+            const ci = document.getElementById('regCI').value.trim();
+            const email = document.getElementById('regEmail').value.trim();
+            const pass = document.getElementById('regPass').value.trim();
+            const role = document.getElementById('regType').value;
+
+            if (!name || !ci || !pass) {
+                showToast("Completa al menos Nombre, Cédula y Contraseña.");
+                return;
+            }
+
+            const newUser = { ci, email, pass, name, surname, role, age: document.getElementById('regAge').value };
+            registeredUsers.push(newUser);
+            currentUser = newUser;
+            document.getElementById('authScreen').classList.add('hidden');
+            updateUserUI();
+            renderAdminUsers();
+            showToast("Registro completado con éxito.");
+        }
+
+        function updateUserUI() {
+            if (!currentUser) return;
+            document.getElementById('navName').innerText = `${currentUser.name} ${currentUser.surname}`;
+            document.getElementById('navRole').innerText = currentUser.role === 'admin' ? 'Super Admin' : (currentUser.role === 'docente' ? 'Docente' : 'Estudiante/Padre');
+            document.getElementById('navAvatar').innerText = currentUser.name.substr(0,2).toUpperCase();
+
+            // Admin panel toggle
+            if (currentUser.role === 'admin') {
+                document.getElementById('navAdminBtn').classList.remove('hidden');
+            } else {
+                document.getElementById('navAdminBtn').classList.add('hidden');
+            }
+
+            // Hide teacher actions if student
+            document.querySelectorAll('.docente-only').forEach(el => {
+                if (currentUser.role === 'estudiante' || currentUser.role === 'padre') el.classList.add('hidden');
+                else el.classList.remove('hidden');
+            });
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById('authScreen').classList.remove('hidden');
+        }
+
+        function openForgotModal() { document.getElementById('forgotModal').classList.remove('hidden'); }
+        function closeForgotModal() { document.getElementById('forgotModal').classList.add('hidden'); }
+        function submitRecovery() {
+            showToast("Se ha simulado el envío de un enlace de recuperación a tu casilla.");
+            closeForgotModal();
+        }
+
+        // URUGUAY AI PLANNING GENERATOR
+        async function generateUruguayPlan() {
+            const topic = document.getElementById('planTopic').value.trim();
+            const subject = document.getElementById('planSubject').value.trim() || 'General';
+            const grade = document.getElementById('planGrade').value;
+            const period = document.getElementById('planPeriod').value;
+
+            if (!topic) {
+                showToast("Ingresa un tema o contenido curricular.");
+                return;
+            }
+
+            const btn = document.getElementById('btnGenPlan');
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Consultando Pautas Pedagogicas...`;
+
+            try {
+                const prompt = `Actúa como un inspector pedagógico uruguayo de ANEP / CFE. 
+                Genera una planificación didáctica en formato JSON para la modalidad "${period}", nivel "${grade}", asignatura "${subject}" y tema "${topic}".
+                Devuelve estrictamente la siguiente estructura JSON:
+                {
+                    "title": "Título estructurado según pauta",
+                    "objectives": "Metas de aprendizaje e intencionalidad pedagógica",
+                    "criteria": "Criterios de logro evaluables según el Marco Curricular",
+                    "activities": "Secuencia didáctica (Inicio, Desarrollo y Cierre)",
+                    "notes": "Recursos (CREA, Ceibal, Cuadernos de hacer matemática/lengua)"
+                }`;
+
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                });
+
+                const data = await response.json();
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                    const parsed = JSON.parse(text);
+                    planningUnits.unshift({
+                        id: Date.now(),
+                        title: parsed.title || `Plan: ${topic}`,
+                        subject: `${subject} (${grade})`,
+                        period: period,
+                        objectives: parsed.objectives || '',
+                        criteria: parsed.criteria || '',
+                        activities: parsed.activities || '',
+                        notes: parsed.notes || ''
+                    });
+                    renderPlanningUnits();
+                    showToast("Planificación generada con pautas uruguayas.");
+                }
+            } catch (err) {
+                showToast("Error al conectar con la IA.");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-sparkles"></i> Generar Planificación con Pautas Pedagógicas`;
+            }
+        }
+
+        function renderPlanningUnits() {
+            const container = document.getElementById('planningUnitsContainer');
+            container.innerHTML = '';
+            planningUnits.forEach(u => {
+                const card = document.createElement('div');
+                card.className = "bg-white dark:bg-slate-800 rounded-3xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm space-y-4 print-card";
+                card.innerHTML = `
+                    <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+                        <div>
+                            <h3 class="font-extrabold text-base text-slate-800 dark:text-slate-100">${escapeHtml(u.title)}</h3>
+                            <span class="text-xs text-brand-600 dark:text-brand-400 font-semibold">${escapeHtml(u.subject)} • ${escapeHtml(u.period)}</span>
+                        </div>
+                        <button onclick="deletePlan(${u.id})" class="text-rose-500 no-print p-1"><i class="fa-solid fa-trash text-xs"></i></button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                        <div>
+                            <label class="font-bold text-slate-400 uppercase text-[10px] block mb-1">Metas e Intencionalidad</label>
+                            <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl leading-relaxed whitespace-pre-line">${escapeHtml(u.objectives)}</div>
+                        </div>
+                        <div>
+                            <label class="font-bold text-slate-400 uppercase text-[10px] block mb-1">Criterios de Logro</label>
+                            <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl leading-relaxed whitespace-pre-line">${escapeHtml(u.criteria)}</div>
+                        </div>
+                    </div>
+                    <div class="text-xs">
+                        <label class="font-bold text-slate-400 uppercase text-[10px] block mb-1">Secuencia Didáctica (Inicio, Desarrollo y Cierre)</label>
+                        <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl leading-relaxed whitespace-pre-line">${escapeHtml(u.activities)}</div>
+                    </div>
+                    <div class="text-xs">
+                        <label class="font-bold text-slate-400 uppercase text-[10px] block mb-1">Recursos didácticos sugeridos</label>
+                        <div class="text-slate-500">${escapeHtml(u.notes)}</div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function deletePlan(id) {
+            planningUnits = planningUnits.filter(u => u.id !== id);
+            renderPlanningUnits();
+        }
+
+        function exportPlanningPDF() {
+            window.print();
+        }
+
+        // GROUPS & CODE GENERATION
+        function renderFolders() {
+            const grid = document.getElementById('foldersGrid');
+            grid.innerHTML = '';
+            folders.forEach(f => {
+                const card = document.createElement('div');
+                card.className = "bg-white dark:bg-slate-800 rounded-3xl p-5 border border-slate-200 dark:border-slate-700 shadow-sm space-y-3";
+                card.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-2xl ${f.color} flex items-center justify-center text-white text-lg">
+                                <i class="fa-solid fa-folder"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-xs">${escapeHtml(f.name)}</h4>
+                                <span class="text-[10px] text-slate-400">${f.students} Alumnos</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-3 bg-slate-50 dark:bg-slate-900 rounded-2xl flex items-center justify-between border border-slate-200 dark:border-slate-700">
+                        <div>
+                            <span class="text-[9px] font-bold uppercase text-slate-400 block">Código Único de Ingreso</span>
+                            <span class="font-mono font-extrabold text-sm text-brand-600 tracking-wider">${f.code}</span>
+                        </div>
+                        <button onclick="regenerateCode(${f.id})" class="px-2.5 py-1 bg-slate-200 dark:bg-slate-700 rounded-lg text-[10px] font-bold hover:bg-slate-300">
+                            <i class="fa-solid fa-rotate"></i> Reiniciar
+                        </button>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function regenerateCode(id) {
+            const f = folders.find(x => x.id === id);
+            if (f) {
+                f.code = 'EDU-' + Math.floor(1000 + Math.random() * 9000);
+                renderFolders();
+                showToast(`Nuevo código generado para ${f.name}: ${f.code}`);
+            }
+        }
+
+        function openFolderModal() { document.getElementById('folderModal').classList.remove('hidden'); }
+        function closeFolderModal() { document.getElementById('folderModal').classList.add('hidden'); }
+        function saveFolder() {
+            const name = document.getElementById('folderName').value.trim();
+            if (name) {
+                folders.push({
+                    id: Date.now(),
+                    name: name,
+                    color: "bg-indigo-500",
+                    code: 'EDU-' + Math.floor(1000 + Math.random() * 9000),
+                    students: 0
+                });
+                renderFolders();
+                closeFolderModal();
+                showToast("Clase creada.");
+            }
+        }
+
+        // AGENDA & NOTIFICATIONS
+        function renderAgenda() {
+            const list = document.getElementById('agendaList');
+            list.innerHTML = '';
+            agendaEvents.forEach(e => {
+                const item = document.createElement('div');
+                item.className = "p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-between text-xs";
+                item.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 rounded-xl ${e.type === 'Salud' ? 'bg-rose-500' : 'bg-brand-500'} text-white font-bold">
+                            <i class="fa-solid ${e.type === 'Salud' ? 'fa-pills' : 'fa-calendar'}"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-slate-800 dark:text-slate-100">${escapeHtml(e.title)}</h4>
+                            <span class="text-[10px] text-slate-400">Fecha: ${e.date} a las ${e.time} hs (${e.type})</span>
+                        </div>
+                    </div>
+                    <button onclick="deleteEvent(${e.id})" class="text-rose-500"><i class="fa-solid fa-xmark"></i></button>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function addAgendaEvent() {
+            const title = document.getElementById('eventTitle').value.trim();
+            const date = document.getElementById('eventDate').value;
+            const time = document.getElementById('eventTime').value;
+            const type = document.getElementById('eventType').value;
+
+            if (!title || !date) {
+                showToast("Completa al menos Título y Fecha.");
+                return;
+            }
+
+            agendaEvents.push({ id: Date.now(), title, date, time, type });
+            renderAgenda();
+            checkNearAgendaEvents();
+            showToast("Evento agendado con notificación.");
+        }
+
+        function deleteEvent(id) {
+            agendaEvents = agendaEvents.filter(e => e.id !== id);
+            renderAgenda();
+        }
+
+        function checkNearAgendaEvents() {
+            const today = new Date().toISOString().split('T')[0];
+            const near = agendaEvents.filter(e => e.date === today);
+            if (near.length > 0 && Notification.permission === "granted") {
+                new Notification("EduPlan Uruguay - Alerta de Agenda", {
+                    body: `Tienes ${near.length} evento(s) o medicación programada para hoy.`,
+                    icon: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png"
+                });
+            }
+        }
+
+        function requestNotificationPermission() {
+            if ("Notification" in window) {
+                Notification.requestPermission().then(p => {
+                    if (p === "granted") showToast("Alertas activadas.");
+                });
+            }
+        }
+
+        // STUDENT TRACKING TABLE
+        function renderStudentTable() {
+            const body = document.getElementById('studentTableBody');
+            body.innerHTML = '';
+            studentTasks.forEach(s => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 dark:hover:bg-slate-700/30";
+                tr.innerHTML = `
+                    <td class="py-3 font-bold">${escapeHtml(s.name)}</td>
+                    <td class="py-3 text-slate-400">${escapeHtml(s.class)}</td>
+                    <td class="py-3">${escapeHtml(s.task)}</td>
+                    <td class="py-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${s.status === 'Entregado' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${s.status}</span></td>
+                    <td class="py-3 font-bold text-brand-600">${s.grade}</td>
+                `;
+                body.appendChild(tr);
+            });
+        }
+
+        function addStudentTask() {
+            showToast("Función para asignar nueva tarea colectiva ejecutada.");
+        }
+
+        // SUPERADMIN PANEL LOGIC (DAVID)
+        function renderAdminUsers() {
+            const body = document.getElementById('adminUsersTable');
+            if (!body) return;
+            body.innerHTML = '';
+            registeredUsers.forEach(u => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-2 font-mono font-bold">${u.ci}</td>
+                    <td class="py-2">${u.name} ${u.surname}</td>
+                    <td class="py-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${u.role === 'admin' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}">${u.role}</span></td>
+                    <td class="py-2 text-slate-400">${u.email || 'N/A'}</td>
+                `;
+                body.appendChild(tr);
+            });
+            document.getElementById('adminCountDocentes').innerText = registeredUsers.filter(u => u.role === 'docente' || u.role === 'admin').length;
+            document.getElementById('adminCountUsers').innerText = registeredUsers.length;
+        }
+
+        // UTILS
+        function startClock() {
+            setInterval(() => {
+                const now = new Date();
+                const time = now.toLocaleTimeString('es-UY');
+                const date = now.toLocaleDateString('es-UY', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+                document.getElementById('headerClock').innerText = time;
+                document.getElementById('headerDate').innerText = date;
+                const wt = document.getElementById('widgetTime');
+                const wd = document.getElementById('widgetDate');
+                if (wt) wt.innerText = time;
+                if (wd) wd.innerText = date;
+            }, 1000);
+        }
+
+        function switchTab(tabId) {
+            activeTab = tabId;
+            document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                if (btn.dataset.tab === tabId) {
+                    btn.classList.add('bg-brand-50', 'text-brand-600', 'dark:bg-brand-950/50', 'dark:text-brand-400');
+                } else {
+                    btn.classList.remove('bg-brand-50', 'text-brand-600', 'dark:bg-brand-950/50', 'dark:text-brand-400');
+                }
+            });
+            document.getElementById('sidebar').classList.add('-translate-x-full');
+        }
+
+        function setupSidebarToggle() {
+            document.getElementById('mobileMenuBtn').onclick = () => {
+                document.getElementById('sidebar').classList.toggle('-translate-x-full');
+            };
+        }
+
+        function setupThemeToggle() {
+            document.getElementById('themeToggle').onclick = () => {
+                document.documentElement.classList.toggle('dark');
+            };
+        }
+
+        function openForumModal() { document.getElementById('forumModal').classList.remove('hidden'); }
+        function closeForumModal() { document.getElementById('forumModal').classList.add('hidden'); }
+        function submitForumPost() {
+            const title = document.getElementById('postTitle').value.trim();
+            const content = document.getElementById('postContent').value.trim();
+            if (title && content) {
+                forumPosts.unshift({ id: Date.now(), author: currentUser ? currentUser.name : "Anónimo", role: "Docente", title, content, date: "Ahora" });
+                renderForumPosts();
+                closeForumModal();
+            }
+        }
+
+        function renderForumPosts() {
+            const container = document.getElementById('forumPostsContainer');
+            container.innerHTML = '';
+            forumPosts.forEach(p => {
+                const card = document.createElement('div');
+                card.className = "bg-white dark:bg-slate-800 rounded-3xl p-5 border border-slate-200 dark:border-slate-700 space-y-2";
+                card.innerHTML = `
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="font-bold text-brand-600">${escapeHtml(p.author)}</span>
+                        <span class="text-[10px] text-slate-400">${p.date}</span>
+                    </div>
+                    <h3 class="font-bold text-sm text-slate-800 dark:text-slate-100">${escapeHtml(p.title)}</h3>
+                    <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">${escapeHtml(p.content)}</p>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function exportDraftTXT() {
+            const title = document.getElementById('draftTitle').value.trim() || 'Borrador_EduPlan';
+            const body = document.getElementById('draftBody').value;
+            const blob = new Blob([body], { type: "text/plain;charset=utf-8" });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${title}.txt`;
+            a.click();
+        }
+
+        async function aiEnhanceDraft() {
+            showToast("Optimizando borrador con IA...");
+        }
+
+        function showToast(msg) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = "pointer-events-auto bg-slate-900 text-white dark:bg-white dark:text-slate-900 px-4 py-2.5 rounded-2xl text-xs font-bold shadow-2xl flex items-center gap-2 transform transition-all duration-300 translate-y-4 opacity-0";
+            toast.innerHTML = `<i class="fa-solid fa-circle-info text-brand-400"></i> <span>${msg}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.remove('translate-y-4', 'opacity-0'), 10);
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-4');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
