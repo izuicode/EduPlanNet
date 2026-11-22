@@ -4,6 +4,6 @@ compatibility_date = "2025-01-01"
 
 [vars]
 ALLOWED_ORIGIN = "https://eduplannet.lat,https://www.eduplannet.lat"
-SUPABASE_URL = "https://TU-PROYECTO.supabase.co"          # pública
-SUPABASE_KEY = "sb_publishable_XXXXXXXXXXXXXXXX"          # clave PUBLICA (publishable/anon), nunca la secret
+SUPABASE_URL = "https://yuvzvjumcbqxuentzxtf.supabase.co"          # pública
+SUPABASE_KEY = "sb_publishable_sDyNvCS2sOgsgQNALCOtew_DdbnerPS"          # clave PUBLICA (publishable/anon), nunca la secret
 # La clave de Gemini NO va aquí: wrangler secret put GEMINI_API_KEY
