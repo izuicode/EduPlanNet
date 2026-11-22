@@ -1,0 +1,7 @@
+# Nunca subir secretos
+config.json
+.env
+.dev.vars
+*.pem
+service-account*.json
+node_modules/

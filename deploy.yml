@@ -1,0 +1,33 @@
+name: Deploy EduPlanNet
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.d.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generar config.json (solo valores públicos) y bloquear claves secretas
+        env:
+          SB_URL: ${{ vars.SUPABASE_URL }}
+          SB_KEY: ${{ vars.SUPABASE_PUBLISHABLE_KEY }}
+          AI_PROXY: ${{ vars.AI_PROXY_URL }}
+        run: |
+          case "$SB_KEY" in sb_secret_*|"") echo "::error::SUPABASE_PUBLISHABLE_KEY vacía o es una clave secreta"; exit 1;; esac
+          if echo "$SB_KEY" | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | grep -q service_role; then echo "::error::Es una clave service_role"; exit 1; fi
+          mkdir site
+          cp index.html site/index.html
+          jq -n --arg u "$SB_URL" --arg k "$SB_KEY" --arg p "$AI_PROXY" '{supabase:{url:$u,key:$k},aiProxy:$p}' > site/config.json
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: d
+        uses: actions/deploy-pages@v4

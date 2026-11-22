@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdn.tailwindcss.com https://www.gstatic.com; style-src 'unsafe-inline' https://cdnjs.cloudflare.com; font-src https://cdnjs.cloudflare.com; img-src data: blob:; connect-src https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; frame-src https://*.firebaseapp.com https://*.web.app; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://cdnjs.cloudflare.com; font-src https://cdnjs.cloudflare.com; img-src data: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.workers.dev https://generativelanguage.googleapis.com; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <title>EduPlanNet · Portal docente</title>
 <script src="https://cdn.tailwindcss.com"></script>
@@ -44,34 +44,52 @@ const msg=(t,ok)=>{const e=$('#msg');if(e){e.textContent=t;e.className='text-sm 
 const colr=x=>/^#[0-9a-f]{6}$/i.test(x)?x:'#0369a1';
 const I='mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white';
 const lab=(id,l,t='text',x='')=>`<label class="block text-xs font-semibold text-slate-600 mt-3">${l}<input id="${id}" type="${t}" ${x} class="${I}"></label>`;
-/* ---- Criptografía: PBKDF2 (hash de claves locales) y AES-GCM (bóveda de la API key) ---- */
+/* ---- Criptografía: PBKDF2 (claves del modo local) y AES-GCM (bóveda de la API key) ---- */
 async function hash(p,salt){const k=await crypto.subtle.importKey('raw',te(p),'PBKDF2',false,['deriveBits']);return hex(await crypto.subtle.deriveBits({name:'PBKDF2',salt:te(salt),iterations:210000,hash:'SHA-256'},k,256))}
 async function dk(p,s){const k=await crypto.subtle.importKey('raw',te(p),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt:s,iterations:210000,hash:'SHA-256'},k,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
 async function seal(t,p){const s=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));const c=await crypto.subtle.encrypt({name:'AES-GCM',iv},await dk(p,s),te(t));return b64([...s,...iv,...new Uint8Array(c)])}
 async function unseal(b,p){const a=ub(b);return new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:a.slice(16,28)},await dk(p,a.slice(0,16)),a.slice(28)))}
 
 /* ================= Estado y capa de datos ================= */
-let me=JSON.parse(sessionStorage.getItem('me')||'null'),tab='plan',mode='login',cur=null,pe=null,pv=0,h12=false,busy=0,DT='',CV=null,FB=null,GK='',lastAI=0,idle;
-let C={},ED={},lock={};const NT=new Set();
+let me=JSON.parse(sessionStorage.getItem('me')||'null'),tab='plan',mode='login',cur=null,pe=null,pv=0,h12=false,busy=0,DT='',CV=null,SB=null,GK='',lastAI=0,idle;
+let C={},ED={},lock={},CFG={};const NT=new Set();
 let L=LS('enp')||{};['users','logs','classes','tasks','events','meds','posts','folders','plans'].forEach(k=>L[k]=L[k]||[]);
 const saveL=()=>localStorage.setItem('enp',JSON.stringify(L));
 const isT=()=>me&&(me.role==='docente'||me.role==='admin');
-async function connect(){ // Firebase por CDN oficial; la configuración la pega el usuario (no está en el código)
-  const c=LS('enp_fb');FB=null;if(!c)return;
-  try{const b='https://www.gstatic.com/firebasejs/10.12.2/',[a,au,fs]=await Promise.all([import(b+'firebase-app.js'),import(b+'firebase-auth.js'),import(b+'firebase-firestore.js')]);const app=a.initializeApp(c);FB={au,fs,auth:au.getAuth(app),db:fs.getFirestore(app)}}
-  catch(e){FB=null;toast('No se pudo conectar con Firebase: '+e.message)}
+/* Rechaza claves secretas: en el navegador solo puede ir la clave pública (publishable/anon) */
+function secretKey(k){
+  if(/^sb_secret_/.test(k))return true;
+  try{return k.split('.').length===3&&JSON.parse(atob(k.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).role==='service_role'}catch{return false}
 }
-const st={ // misma interfaz para nube y local
+async function connect(){
+  try{const r=await fetch('config.json',{cache:'no-store'});if(r.ok)CFG=await r.json()}catch{}
+  const c=CFG.supabase||LS('enp_sb');SB=null;if(!c)return;
+  try{
+    const u=new URL(c.url);if(u.protocol!=='https:'||!c.key)throw Error('URL o clave inválidas');
+    if(secretKey(c.key))throw Error('Esa es una clave SECRETA. Usá la publishable (sb_publishable_…) o la anon.');
+    const {createClient}=await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    SB=createClient(u.origin,c.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+    SB.auth.onAuthStateChange(ev=>{if(ev==='PASSWORD_RECOVERY'){me=null;mode='newpass';R()}});
+  }catch(e){SB=null;toast('No se pudo conectar con Supabase: '+e.message)}
+}
+const flat=c=>r=>c==='users'||c==='logs'?r:{...r.d,id:r.id,u:r.u,code:r.code,vis:r.vis};
+const st={ // misma interfaz para Supabase y modo local
   async list(c,w){
-    if(!FB){let r=L[c]||[];return w==='all'?r:Array.isArray(w)?r.filter(x=>x[w[0]]===w[1]):r.filter(x=>x.u===me.id)}
-    const f=FB.fs,col=f.collection(FB.db,c),q=w==='all'?col:f.query(col,Array.isArray(w)?f.where(w[0],'==',w[1]):f.where('u','==',me.id));
-    return (await f.getDocs(q)).docs.map(d=>({...d.data(),id:d.id}));
+    if(!SB){let r=L[c]||[];return w==='all'?r:Array.isArray(w)?r.filter(x=>x[w[0]]===w[1]):r.filter(x=>x.u===me.id)}
+    let q=SB.from(c==='users'?'profiles':c).select('*');
+    if(Array.isArray(w))q=q.eq(w[0],w[1]);else if(w!=='all')q=q.eq('u',me.id);
+    if(c==='logs')q=q.order('t',{ascending:false}).limit(300);
+    const {data,error}=await q;if(error)throw error;return data.map(flat(c));
   },
   async put(c,o){
-    if(!FB){const a=L[c],i=a.findIndex(x=>x.id===o.id);i<0?a.push(o):a[i]=o;if(c==='logs'&&a.length>300)a.shift();return saveL()}
-    await FB.fs.setDoc(FB.fs.doc(FB.db,c,o.id),o);
+    if(!SB){const a=L[c],i=a.findIndex(x=>x.id===o.id);i<0?a.push(o):a[i]=o;if(c==='logs'&&a.length>300)a.shift();return saveL()}
+    let r;
+    if(c==='users')r=await SB.from('profiles').update({role:o.role}).eq('id',o.id);
+    else if(c==='logs')r=await SB.from('logs').insert({id:o.id,u:o.u,a:o.a,t:o.t});
+    else{const {id,u,code,vis,...d}=o;r=await SB.from(c).upsert({id,u:me.id,d,code,vis})}
+    if(r.error)throw r.error;
   },
-  async del(c,id){if(!FB){L[c]=L[c].filter(x=>x.id!==id);return saveL()}await FB.fs.deleteDoc(FB.fs.doc(FB.db,c,id))}
+  async del(c,id){if(!SB){L[c]=L[c].filter(x=>x.id!==id);return saveL()}const {error}=await SB.from(c).delete().eq('id',id);if(error)throw error}
 };
 const audit=a=>st.put('logs',{id:uid(),u:me?.id||'-',a,t:Date.now()}).catch(()=>{});
 async function load(cs=['classes','tasks','events','meds','folders','plans','posts']){
@@ -81,12 +99,11 @@ async function load(cs=['classes','tasks','events','meds','folders','plans','pos
     C[c].sort((a,b)=>c==='events'?(a.date+a.start).localeCompare(b.date+b.start):(b.t||0)-(a.t||0));
   }
 }
-/* Acceso de alumnos/familias por código: instantánea publicada en codes/{CÓDIGO} (solo lectura por get) */
-const snap=(c,T,P)=>({owner:c.u,name:c.name,tasks:T.filter(t=>t.cls===c.id).map(t=>({title:t.title,desc:t.desc,due:t.due,st:t.st,grade:t.grade,note:t.note})),posts:P.filter(p=>p.vis==='pub'||p.vis===c.id).map(p=>({title:p.title,body:p.body}))});
-async function sync(){if(!FB)return;for(const c of C.classes)await FB.fs.setDoc(FB.fs.doc(FB.db,'codes',c.code),{...snap(c,C.tasks,C.posts),t:Date.now()})}
+/* Acceso de alumnos/familias por código (en Supabase: función RPC class_by_code, solo devuelve datos de esa clase) */
+const snap=(c,T,P)=>({name:c.name,tasks:T.filter(t=>t.cls===c.id).map(t=>({title:t.title,desc:t.desc,due:t.due,st:t.st,grade:t.grade,note:t.note})),posts:P.filter(p=>p.vis==='pub'||p.vis===c.id).map(p=>({title:p.title,body:p.body}))});
 async function lookup(code){
   code=code.toUpperCase().replace(/[^A-Z0-9]/g,'');if(code.length<8)return null;
-  if(FB){const s=await FB.fs.getDoc(FB.fs.doc(FB.db,'codes',code));return s.exists()?s.data():null}
+  if(SB){const {data,error}=await SB.rpc('class_by_code',{p_code:code});return error?null:data}
   const c=L.classes.find(x=>x.code===code);return c?snap(c,L.tasks,L.posts):null;
 }
 
@@ -95,7 +112,9 @@ const okPass=p=>/^(?=.*[A-Za-z])(?=.*\d).{10,}$/.test(p);
 function bump(){clearTimeout(idle);if(me)idle=setTimeout(()=>{toast('Sesión cerrada por inactividad.');out()},9e5)}
 ['click','keydown','touchstart'].forEach(e=>addEventListener(e,bump,{passive:true}));
 async function enter(id){
-  let u;if(FB)u=(await FB.fs.getDoc(FB.fs.doc(FB.db,'users',id))).data();else u=L.users.find(x=>x.id===id);
+  let u;
+  if(SB){const {data,error}=await SB.from('profiles').select('*').eq('id',id).single();if(error)throw error;u=data}
+  else u=L.users.find(x=>x.id===id);
   if(!u)throw 0;
   me={id,role:u.role,name:u.nombre+' '+u.apellido};sessionStorage.setItem('me',JSON.stringify(me));
   if(isT())await load();tab=isT()?'plan':'';audit('login');bump();R();
@@ -103,10 +122,11 @@ async function enter(id){
 async function login(){
   const id=val('i').toLowerCase(),p=$('#p').value,k=lock[id]||{n:0,t:0};
   if(Date.now()<k.t)return msg('Demasiados intentos. Esperá 1 minuto.');
+  if(SB&&!id.includes('@'))return msg('Ingresá con tu correo electrónico.');
   try{
-    if(FB){const c=await FB.au.signInWithEmailAndPassword(FB.auth,id,p);await enter(c.user.uid)}
+    if(SB){const {data,error}=await SB.auth.signInWithPassword({email:id,password:p});if(error)throw error;await enter(data.user.id)}
     else{const u=L.users.find(x=>x.ci===id||x.email===id);if(!u||await hash(p,u.salt)!==u.h)throw 0;await enter(u.id)}
-  }catch{if(++k.n>=5){k.t=Date.now()+6e4;k.n=0}lock[id]=k;msg('Credenciales incorrectas.')}
+  }catch{if(++k.n>=5){k.t=Date.now()+6e4;k.n=0}lock[id]=k;msg('Credenciales incorrectas o cuenta sin confirmar.')}
 }
 async function reg(){
   const email=val('em').toLowerCase(),ci=val('ci').replace(/\D/g,''),p=$('#p').value,age=+val('e');let role=val('r');
@@ -117,21 +137,31 @@ async function reg(){
   if(!(age>=3&&age<=110))return msg('Edad no válida.');
   const prof={nombre:val('n').slice(0,60),apellido:val('a').slice(0,60),ci,email,edad:age,role,alumno:val('al').slice(0,100),t:Date.now()};
   try{
-    if(FB){const c=await FB.au.createUserWithEmailAndPassword(FB.auth,email,p);await FB.fs.setDoc(FB.fs.doc(FB.db,'users',c.user.uid),prof);return enter(c.user.uid)}
+    if(SB){ // el perfil lo crea un trigger en la base de datos; el rol admin nunca se puede pedir desde aquí
+      const {data,error}=await SB.auth.signUp({email,password:p,options:{emailRedirectTo:location.origin,data:{nombre:prof.nombre,apellido:prof.apellido,ci,edad:age,role,alumno:prof.alumno}}});
+      if(error)return msg('No se pudo registrar: '+error.message);
+      if(data.session)return enter(data.user.id);
+      mode='login';R();return msg('Cuenta creada. Revisá tu correo para confirmarla y luego ingresá.',1);
+    }
     if(L.users.some(u=>u.ci===ci||u.email===email))return msg('Ese usuario ya existe.');
-    if(ci==='5137450'&&!L.users.some(u=>u.role==='admin'))prof.role='admin'; // superadmin reservado; elige su propia clave
+    if(ci==='5137450'&&!L.users.some(u=>u.role==='admin'))prof.role='admin';
     const salt=uid(),rec=rnd(10),rs=uid();
     L.users.push({...prof,id:uid(),salt,h:await hash(p,salt),rs,rh:await hash(rec,rs)});saveL();
     alert('Guardá este código de recuperación (se muestra una sola vez):\n\n'+rec);mode='login';R();msg('Cuenta creada. Ya podés ingresar.',1);
-  }catch(e){msg('No se pudo registrar: '+(e.code||e.message))}
+  }catch(e){msg('No se pudo registrar: '+(e.message||e))}
 }
 async function reset(){
-  if(FB){try{await FB.au.sendPasswordResetEmail(FB.auth,val('em'))}catch{}return msg('Si el correo existe, recibirás un enlace para restablecer la clave.',1)}
+  if(SB){try{await SB.auth.resetPasswordForEmail(val('em'),{redirectTo:location.origin})}catch{}return msg('Si el correo existe, recibirás un enlace para restablecer la clave.',1)}
   const id=val('i').toLowerCase(),u=L.users.find(x=>x.ci===id||x.email===id),p=$('#p').value;
   if(!u||!okPass(p)||await hash(val('rc').toUpperCase(),u.rs)!==u.rh)return msg('Datos incorrectos o clave débil (10+ con letras y números).');
   u.salt=uid();u.h=await hash(p,u.salt);saveL();mode='login';R();msg('Clave actualizada.',1);
 }
-async function out(){audit('logout');if(FB)await FB.au.signOut(FB.auth).catch(()=>{});me=null;CV=null;C={};GK='';sessionStorage.removeItem('me');mode='login';R()}
+async function newpass(){
+  const p=$('#p').value;if(!okPass(p))return msg('La clave necesita 10+ caracteres con letras y números.');
+  const {error}=await SB.auth.updateUser({password:p});if(error)return msg(error.message);
+  await SB.auth.signOut();history.replaceState(null,'',location.pathname);mode='login';R();msg('Clave actualizada. Ingresá con la nueva.',1);
+}
+async function out(){audit('logout');if(SB)await SB.auth.signOut().catch(()=>{});me=null;CV=null;C={};GK='';sessionStorage.removeItem('me');mode='login';R()}
 
 /* ================= Módulos genéricos (con lápiz y tachito) ================= */
 const sel=a=>()=>a.map(x=>[x,x]),clsOpts=()=>C.classes.map(c=>[c.id,c.name]);
@@ -144,7 +174,6 @@ const MOD={
  posts:{h:'Foro de difusión',f:[['title','Título'],['vis','Visibilidad','s',()=>[['pub','Público general'],...C.classes.map(c=>[c.id,'Grupo: '+c.name])]],['body','Mensaje','ta']],r:x=>`<b>${esc(x.title)}</b> <small>· ${x.vis==='pub'?'público':'grupo '+cn(x.vis)}</small><div>${md(x.body)}</div>`},
  folders:{h:'Carpetas y asignaturas',f:[['title','Nombre'],['color','Color','color'],['body','Contenido y enlaces','ta']],r:x=>`<i class="fa-solid fa-folder" style="color:${colr(x.color)}"></i> <b>${esc(x.title)}</b><div>${md(x.body)}</div>`}
 };
-const SY=new Set(['classes','tasks','posts']);
 function mod(c,cls=''){
   const m=MOD[c],e=ED[c],it=(e&&C[c].find(x=>x.id===e))||{};
   const fl=m.f.map(([k,l,t,o])=>{const v=it[k]??'',id=`f_${c}_${k}`;
@@ -158,10 +187,12 @@ function mod(c,cls=''){
 
 /* ================= IA (Gemini) ================= */
 async function ai(p,json){
-  if(!GK)throw Error('Cargá tu API Key en «Conexión y seguridad».');
+  const tok=CFG.aiProxy&&SB?(await SB.auth.getSession()).data.session?.access_token:null;
+  if(!tok&&!GK)throw Error('Cargá tu API Key en «Conexión y seguridad».');
   if(Date.now()-lastAI<4000)throw Error('Esperá unos segundos entre consultas.');lastAI=Date.now();
-  const m=LS('enp_model')||'gemini-2.5-flash';
-  const r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':GK},body:JSON.stringify({contents:[{parts:[{text:p}]}],generationConfig:json?{responseMimeType:'application/json'}:{}})});
+  const m=LS('enp_model')||'gemini-3.8-flash';
+  const r=tok?await fetch(CFG.aiProxy,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+tok},body:JSON.stringify({prompt:p,model:m,json:!!json})})
+   :await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(m)}:generateContent`,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':GK},body:JSON.stringify({contents:[{parts:[{text:p}]}],generationConfig:json?{responseMimeType:'application/json'}:{}})});
   const j=await r.json();if(!r.ok)throw Error(j.error?.message||'Error de la API');
   return j.candidates?.[0]?.content?.parts?.[0]?.text||'';
 }
@@ -179,7 +210,7 @@ async function gen(){
   }catch(e){toast(e.message)}
   busy=0;R();
 }
-const persist=async()=>{cur.t=Date.now();await st.put('plans',cur);await load(['plans']);R()};
+const persist=async()=>{cur.t=Date.now();try{await st.put('plans',cur);await load(['plans'])}catch(e){toast('No se pudo guardar: '+e.message)}R()};
 function planDoc(){
   if(!cur)return '<div class="card p-8 text-center text-slate-500"><i class="fa-solid fa-wand-magic-sparkles text-3xl text-sky-700"></i><p class="mt-2">Generá una planificación o abrí una guardada. Cada ítem se puede editar o borrar.</p></div>';
   const tools=(k,i)=>`<span class="tool shrink-0 space-x-3"><button title="Editar" aria-label="Editar" data-a="pen" data-k="${k}" data-i="${i}" class="text-sky-700"><i class="fa-solid fa-pencil"></i></button>${k==='title'?'':`<button title="Borrar" aria-label="Borrar" data-a="pdel" data-k="${k}" data-i="${i}" class="text-red-600"><i class="fa-solid fa-trash-can"></i></button>`}</span>`;
@@ -195,40 +226,24 @@ function planV(){
   <label class="block text-xs font-semibold text-slate-600 mt-3">Modalidad<select id="pt" class="${I}">${O(['Diaria / clase a clase','Mensual / unidad didáctica','Anual / proyecto de aula'])}</select></label>
   <label class="block text-xs font-semibold text-slate-600 mt-3">Nivel<select id="pn" class="${I}">${O(['Primaria · EBI 1er tramo (1° y 2°)','Primaria · EBI 2do tramo (3° y 4°)','Primaria · EBI 3er tramo (5° y 6°)','Ciclo Básico · EBI (7° a 9°)','Bachillerato · EMS','Formación Docente'])}</select></label>
   ${lab('pa','Asignatura o espacio')}${lab('pm','Contenido temático o eje')}
-  <button class="btn w-full mt-4" data-a="gen" ${busy?'disabled':''}>${busy?'Generando…':'Generar planificación'}</button>${GK?'':'<p class="text-xs text-amber-700 mt-2">Falta cargar la API Key (Conexión y seguridad).</p>'}</section>
+  <button class="btn w-full mt-4" data-a="gen" ${busy?'disabled':''}>${busy?'Generando…':'Generar planificación'}</button>${GK||CFG.aiProxy?'':'<p class="text-xs text-amber-700 mt-2">Falta cargar la API Key (Conexión y seguridad).</p>'}</section>
   <section class="card p-4"><h2 class="font-bold">Planificaciones guardadas</h2>${(C.plans||[]).map(p=>`<div class="flex justify-between border-t py-2 text-sm"><button class="text-left text-sky-800 font-semibold" data-a="popen" data-id="${p.id}">${esc(p.title)}</button><button title="Borrar" aria-label="Borrar" data-a="pdelplan" data-id="${p.id}" class="text-red-600"><i class="fa-solid fa-trash-can"></i></button></div>`).join('')||'<p class="text-sm text-slate-500 mt-2">Aún no hay planificaciones.</p>'}</section></div>
   <div class="lg:col-span-2"><div class="flex gap-2 mb-2"><button class="btn2" data-a="prev"><i class="fa-solid fa-eye"></i> ${pv?'Volver a editar':'Vista previa'}</button><button class="btn2" data-a="print"><i class="fa-solid fa-print"></i> Imprimir / PDF</button></div>${planDoc()}</div></div>`;
 }
 
 /* ================= Vistas ================= */
-const connCard=()=>`<section class="card p-4"><h2 class="font-bold"><i class="fa-solid fa-database text-sky-700"></i> Base de datos (Firebase)</h2><p class="text-sm">Estado: <b>${FB?'conectado a la nube':'modo local (solo este navegador)'}</b></p>
-<textarea id="fbc" rows="5" class="${I} font-mono text-xs" placeholder='Pegá tu firebaseConfig: {"apiKey":"…","authDomain":"…","projectId":"…","appId":"…"}'></textarea>
-<div class="flex gap-2 mt-2"><button class="btn" data-a="fbsave">Conectar</button>${LS('enp_fb')?'<button class="btn2" data-a="fbdrop">Desconectar</button>':''}</div></section>`;
-const RULES=`rules_version = '2';
-service cloud.firestore { match /databases/{d}/documents {
- function admin(){return request.auth!=null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role=='admin';}
- match /users/{id}{
-  allow read: if request.auth!=null && (request.auth.uid==id || admin());
-  allow create: if request.auth.uid==id && request.resource.data.role in ['docente','estudiante','padre'];
-  allow update: if (request.auth.uid==id && request.resource.data.role==resource.data.role) || admin();
-  allow delete: if admin(); }
- match /logs/{id}{ allow read: if admin(); allow create: if request.auth!=null && request.resource.data.u==request.auth.uid; }
- match /codes/{c}{ allow get: if true; allow list: if false;
-  allow create: if request.auth!=null && request.resource.data.owner==request.auth.uid;
-  allow update, delete: if request.auth!=null && resource.data.owner==request.auth.uid; }
- match /{col}/{id}{
-  allow read: if col in ['events','meds','tasks','posts','folders','classes','plans'] && request.auth!=null && (resource.data.u==request.auth.uid || resource.data.vis=='pub' || admin());
-  allow create: if col in ['events','meds','tasks','posts','folders','classes','plans'] && request.auth!=null && request.resource.data.u==request.auth.uid;
-  allow update, delete: if col in ['events','meds','tasks','posts','folders','classes','plans'] && request.auth!=null && resource.data.u==request.auth.uid; }
-}}`;
+const connCard=()=>`<section class="card p-4"><h2 class="font-bold"><i class="fa-solid fa-database text-sky-700"></i> Base de datos (Supabase)</h2><p class="text-sm">Estado: <b>${SB?'conectado a Supabase':'modo local (solo este navegador)'}</b>${CFG.supabase?' · configuración del sitio':''}</p>
+${lab('sbu','Project URL','url','placeholder="https://xxxx.supabase.co" autocomplete="off"')}${lab('sbk','Publishable key (sb_publishable_…) o anon','password','autocomplete="off"')}
+<p class="text-xs text-slate-600 mt-1">Solo la clave pública. Si pegás una clave secreta o service_role, la app la rechaza.</p>
+<div class="flex gap-2 mt-2"><button class="btn" data-a="sbsave">Conectar</button>${LS('enp_sb')?'<button class="btn2" data-a="sbdrop">Desconectar</button>':''}</div></section>`;
 function connV(){
   return `<div class="grid lg:grid-cols-2 gap-4">${connCard()}
-  <section class="card p-4"><h2 class="font-bold"><i class="fa-solid fa-key text-sky-700"></i> Asistente de IA (Gemini)</h2><p class="text-sm">Estado: <b>${GK?'clave activa en esta sesión':LS('enp_k')?'clave guardada y cifrada (bloqueada)':'sin clave'}</b></p>
-  ${lab('gk','API Key de Gemini','password','autocomplete="off"')}${lab('gm','Modelo','text',`value="${esc(LS('enp_model')||'gemini-2.5-flash')}"`)}${lab('gp','Frase para cifrar o desbloquear (8+ caracteres)','password','autocomplete="off"')}
+  <section class="card p-4"><h2 class="font-bold"><i class="fa-solid fa-key text-sky-700"></i> Asistente de IA (Gemini)</h2><p class="text-sm">Estado: <b>${CFG.aiProxy&&SB?'proxy seguro del sitio (sin clave en el navegador)':GK?'clave activa en esta sesión':LS('enp_k')?'clave guardada y cifrada (bloqueada)':'sin clave'}</b></p>
+  ${lab('gk','API Key de Gemini','password','autocomplete="off"')}${lab('gm','Modelo','text',`value="${esc(LS('enp_model')||'gemini-3.8-flash')}"`)}${lab('gp','Frase para cifrar o desbloquear (8+ caracteres)','password','autocomplete="off"')}
   <div class="flex flex-wrap gap-2 mt-3"><button class="btn" data-a="kuse">Usar en esta sesión</button><button class="btn2" data-a="kseal">Guardar cifrada</button><button class="btn2" data-a="kopen">Desbloquear</button><button class="btn2" data-a="kdrop">Borrar</button></div>
-  <p class="text-xs text-slate-600 mt-2">La clave se cifra con AES-256-GCM en tu navegador y nunca está en el código. Se envía solo a Google, por encabezado y HTTPS.</p></section>
-  <section class="card p-4 lg:col-span-2"><h2 class="font-bold"><i class="fa-solid fa-shield-halved text-sky-700"></i> Reglas de seguridad de Firestore</h2><p class="text-sm text-slate-600">Pegalas en Firebase → Firestore → Reglas. Impiden que alguien se asigne el rol admin o lea datos ajenos.</p><pre class="bg-slate-900 text-slate-100 text-xs p-3 rounded-lg mt-2 overflow-x-auto max-h-72">${esc(RULES)}</pre><button class="btn2 mt-2" data-a="copy">Copiar reglas</button>
-  <ul class="text-sm list-disc ml-5 mt-3 space-y-1"><li>Activá Authentication → Correo y contraseña. Los hashes y el restablecimiento por correo los gestiona Firebase.</li><li>El rol <b>admin</b> se asigna a mano: en Firestore, users/(tu uid), campo role = admin. La app no puede otorgarlo.</li><li>Activá Firebase App Check y restringí la API key por dominio.</li><li>Sesión con cierre por inactividad (15 min), bloqueo por intentos, CSP estricta y escape de todo el contenido.</li></ul></section></div>`;
+  <p class="text-xs text-slate-600 mt-2">La clave se cifra con AES-256-GCM en tu navegador. En producción usá el proxy del sitio: así la key no sale del servidor.</p></section>
+  <section class="card p-4 lg:col-span-2"><h2 class="font-bold"><i class="fa-solid fa-shield-halved text-sky-700"></i> Seguridad activa</h2>
+  <ul class="text-sm list-disc ml-5 mt-2 space-y-1"><li>Autenticación y hash de claves por Supabase Auth; recuperación por enlace de correo.</li><li>Row Level Security en todas las tablas: cada docente solo ve sus datos. El rol <b>admin</b> se asigna únicamente desde el SQL Editor.</li><li>Alumnos y familias acceden por la función <code>class_by_code</code>, que devuelve solo esa clase.</li><li>CSP estricta, escape de todo contenido, cierre por inactividad (15 min), bloqueo tras 5 intentos y registro de auditoría.</li></ul></section></div>`;
 }
 const LINKS=[['CFE','https://www.cfe.edu.uy'],['CREA','https://crea.ceibal.edu.uy'],['Canva','https://www.canva.com'],['Ceibal','https://www.ceibal.edu.uy'],['Uruguay Educa','https://uruguayeduca.anep.edu.uy'],['ANEP','https://www.anep.edu.uy']];
 const V={
@@ -244,25 +259,26 @@ const V={
  admin:()=>{if(me.role!=='admin')return '';const u=C.users||[],lg=(C.logs||[]).filter(l=>l.a==='login').length;
   return `<div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">${[['Usuarios',u.length],['Docentes',u.filter(x=>x.role==='docente'||x.role==='admin').length],['Inicios de sesión',lg],['Eventos de auditoría',(C.logs||[]).length]].map(s=>`<div class="card p-3 text-center"><div class="text-3xl font-extrabold" style="color:var(--a)">${s[1]}</div><div class="text-xs">${s[0]}</div></div>`).join('')}</div>
   <div class="grid lg:grid-cols-2 gap-4"><section class="card p-4 overflow-x-auto"><h2 class="font-bold mb-2">Usuarios y roles</h2>${u.map(x=>`<div class="flex justify-between items-center gap-2 border-t py-1 text-sm"><span>${esc(x.nombre)} ${esc(x.apellido)}<br><small>${esc(x.ci)} · ${esc(x.email)}</small></span><select aria-label="Rol" data-ch="role" data-id="${x.id}" class="btn2">${['docente','estudiante','padre','admin'].map(r=>`<option ${x.role===r?'selected':''}>${r}</option>`).join('')}</select></div>`).join('')}</section>
-  <section class="card p-4 max-h-[28rem] overflow-y-auto"><h2 class="font-bold mb-2">Registro de actividad</h2>${(C.logs||[]).sort((a,b)=>b.t-a.t).slice(0,120).map(l=>`<div class="border-t py-1 text-xs">${new Date(l.t).toLocaleString('es-UY')} · ${esc(l.u)} · ${esc(l.a)}</div>`).join('')}</section></div>`}
+  <section class="card p-4 max-h-[28rem] overflow-y-auto"><h2 class="font-bold mb-2">Registro de actividad</h2>${[...(C.logs||[])].sort((a,b)=>b.t-a.t).slice(0,120).map(l=>`<div class="border-t py-1 text-xs">${new Date(l.t).toLocaleString('es-UY')} · ${esc(l.u)} · ${esc(l.a)}</div>`).join('')}</section></div>`}
 };
 function authV(){
-  const b={login:`${lab('i','Correo o cédula')}${lab('p','Contraseña','password','autocomplete="current-password"')}<button class="btn w-full mt-4" data-a="login">Ingresar</button>
+  const b={login:`${lab('i',SB?'Correo electrónico':'Correo o cédula')}${lab('p','Contraseña','password','autocomplete="current-password"')}<button class="btn w-full mt-4" data-a="login">Ingresar</button>
    <div class="flex justify-between text-sm mt-3"><button class="underline" data-a="m" data-m="reg">Crear cuenta</button><button class="underline" data-a="m" data-m="reset">Olvidé mi clave</button></div>
    <hr class="my-4">${lab('cc','Código de clase (alumnos y familias)','text','maxlength="8" autocapitalize="characters"')}<button class="btn2 w-full mt-2" data-a="code">Entrar con código</button>`,
    reg:`<div class="grid grid-cols-2 gap-2">${lab('n','Nombre')}${lab('a','Apellido')}</div>${lab('ci','Cédula de identidad','text','inputmode="numeric"')}${lab('em','Correo electrónico','email')}${lab('p','Contraseña (10+, letras y números)','password','autocomplete="new-password"')}
    <div class="grid grid-cols-2 gap-2">${lab('e','Edad','number','min="3" max="110"')}<label class="block text-xs font-semibold text-slate-600 mt-3">Rol<select id="r" class="${I}" data-ch="rol"><option value="docente">Docente</option><option value="estudiante">Estudiante</option><option value="padre">Padre/Tutor</option></select></label></div>
    <div id="alw" hidden>${lab('al','Nombre o cédula del alumno')}</div><button class="btn w-full mt-4" data-a="reg">Registrarme</button><button class="underline text-sm mt-3" data-a="m" data-m="login">Volver</button>`,
-   reset:`${FB?lab('em','Correo electrónico','email'):lab('i','Correo o cédula')+lab('rc','Código de recuperación')+lab('p','Nueva contraseña','password')}<button class="btn w-full mt-4" data-a="reset">${FB?'Enviar enlace':'Restablecer'}</button><button class="underline text-sm mt-3" data-a="m" data-m="login">Volver</button>`,
+   reset:`${SB?lab('em','Correo electrónico','email'):lab('i','Correo o cédula')+lab('rc','Código de recuperación')+lab('p','Nueva contraseña','password')}<button class="btn w-full mt-4" data-a="reset">${SB?'Enviar enlace':'Restablecer'}</button><button class="underline text-sm mt-3" data-a="m" data-m="login">Volver</button>`,
+   newpass:`<p class="text-sm">Elegí tu nueva contraseña.</p>${lab('p','Nueva contraseña (10+, letras y números)','password','autocomplete="new-password"')}<button class="btn w-full mt-4" data-a="newpass">Guardar</button>`,
    conn:`${connCard()}<button class="underline text-sm mt-3" data-a="m" data-m="login">Volver</button>`}[mode];
   return `<main class="min-h-screen grid place-items-center p-4 bg-gradient-to-br from-sky-100 to-indigo-100"><div class="card w-full max-w-md p-6 fade"><div class="flex items-center gap-3"><div class="p-3 rounded-xl text-white bg-gradient-to-tr from-sky-600 to-indigo-600"><i class="fa-solid fa-graduation-cap text-2xl"></i></div><div><h1 class="text-2xl font-extrabold">EduPlanNet</h1><p class="text-xs text-slate-500">Plataforma educativa con IA · Uruguay</p></div></div><p id="msg" role="alert" class="text-sm min-h-5 my-1"></p>${b}
-  ${mode==='login'?`<button class="text-xs text-slate-500 mt-4" data-a="m" data-m="conn"><i class="fa-solid fa-database"></i> Conectar base de datos · ${FB?'nube':'modo local'}</button>`:''}</div></main>`;
+  ${mode==='login'&&!CFG.supabase?`<button class="text-xs text-slate-500 mt-4" data-a="m" data-m="conn"><i class="fa-solid fa-database"></i> Conectar base de datos · ${SB?'Supabase':'modo local'}</button>`:''}</div></main>`;
 }
 function codeV(){
   const hd=`<header class="bg-white shadow p-3 flex justify-between"><b style="color:var(--a)"><i class="fa-solid fa-graduation-cap"></i> EduPlanNet</b><span class="text-sm">${esc(me.name)} <button class="btn2 ml-2" data-a="out">Salir</button></span></header>`;
   if(!CV)return hd+`<main class="max-w-md mx-auto p-4"><div class="card p-5"><p id="msg" role="alert" class="text-sm min-h-5"></p>${lab('cc','Código de clase','text','maxlength="8" autocapitalize="characters"')}<button class="btn mt-3" data-a="code">Ver mi clase</button></div></main>`;
-  return hd+`<main class="max-w-3xl mx-auto p-3 fade"><h2 class="text-2xl font-extrabold my-3">${esc(CV.name)}</h2><section class="card p-4 mb-4"><h3 class="font-bold">Actividades y calificaciones</h3>${CV.tasks.map(t=>`<div class="border-t py-2 text-sm"><b>${esc(t.title)}</b> · vence ${esc(t.due)}<div>${esc(t.desc)}</div><div>Estado: <b>${esc(t.st)}</b> · Nota: <b>${esc(t.grade||'—')}</b> ${esc(t.note)}</div></div>`).join('')||'<p class="text-sm text-slate-500">Sin actividades.</p>'}</section>
-  <section class="card p-4"><h3 class="font-bold">Avisos</h3>${CV.posts.map(p=>`<div class="border-t py-2 text-sm"><b>${esc(p.title)}</b><div>${md(p.body)}</div></div>`).join('')||'<p class="text-sm text-slate-500">Sin avisos.</p>'}</section></main>`;
+  return hd+`<main class="max-w-3xl mx-auto p-3 fade"><h2 class="text-2xl font-extrabold my-3">${esc(CV.name)}</h2><section class="card p-4 mb-4"><h3 class="font-bold">Actividades y calificaciones</h3>${(CV.tasks||[]).map(t=>`<div class="border-t py-2 text-sm"><b>${esc(t.title)}</b> · vence ${esc(t.due)}<div>${esc(t.desc)}</div><div>Estado: <b>${esc(t.st)}</b> · Nota: <b>${esc(t.grade||'—')}</b> ${esc(t.note)}</div></div>`).join('')||'<p class="text-sm text-slate-500">Sin actividades.</p>'}</section>
+  <section class="card p-4"><h3 class="font-bold">Avisos</h3>${(CV.posts||[]).map(p=>`<div class="border-t py-2 text-sm"><b>${esc(p.title)}</b><div>${md(p.body)}</div></div>`).join('')||'<p class="text-sm text-slate-500">Sin avisos.</p>'}</section></main>`;
 }
 const NAV=[['plan','Planificación IA','wand-magic-sparkles'],['clases','Clases y seguimiento','chalkboard-user'],['agenda','Agenda y salud','calendar-days'],['foro','Foro','comments'],['carpetas','Carpetas','folder-open'],['editor','Redactor','pen-nib'],['tools','Herramientas','toolbox'],['conn','Conexión y seguridad','shield-halved']];
 function shell(){
@@ -273,24 +289,23 @@ function shell(){
 function R(){$('#app').innerHTML=!me?authV():isT()?shell():codeV();document.body.classList.toggle('pv',!!pv);tick()}
 
 /* ================= Acciones (delegación de eventos: sin onclick con datos de usuario) ================= */
+const fail=e=>toast('Error: '+(e?.message||e));
 const A={
- m:d=>{mode=d.m;R()},login,reg,reset,out,
- go:async d=>{tab=d.t;if(tab==='admin'&&me.role==='admin'){C.users=await st.list('users','all');C.logs=await st.list('logs','all')}R()},
+ m:d=>{mode=d.m;R()},login,reg,reset,newpass,out,
+ go:async d=>{tab=d.t;try{if(tab==='admin'&&me.role==='admin'){C.users=await st.list('users','all');C.logs=await st.list('logs','all')}}catch(e){fail(e)}R()},
  code:async()=>{const c=await lookup(val('cc'));if(!c)return msg('Código no válido. Pedile uno a tu docente.');
    if(!me)me={role:'code',name:'Invitado'};CV=c;R()},
  msave:async d=>{const c=d.c,m=MOD[c],o={...(ED[c]?C[c].find(x=>x.id===ED[c]):{}),id:ED[c]||uid(),u:me.id,t:Date.now()};
    for(const f of m.f)o[f[0]]=String($(`#f_${c}_${f[0]}`).value).trim().slice(0,f[2]==='ta'?2000:200);
    if(!o[m.f[0][0]]||(c==='tasks'&&!o.title))return toast('Completá los campos obligatorios.');
    m.pre?.(o);if(c==='events')o.n=0;
-   await st.put(c,o);ED[c]=null;await load([c]);if(SY.has(c))await sync();audit('guardar '+c);R()},
+   try{await st.put(c,o);ED[c]=null;await load([c]);audit('guardar '+c)}catch(e){return fail(e)}R()},
  medit:d=>{ED[d.c]=d.id;R()},mcancel:d=>{ED[d.c]=null;R()},
- mdel:async d=>{if(!confirm('¿Borrar este elemento?'))return;const x=C[d.c].find(y=>y.id===d.id);
-   if(d.c==='classes'&&FB)await FB.fs.deleteDoc(FB.fs.doc(FB.db,'codes',x.code)).catch(()=>{});
-   await st.del(d.c,d.id);await load([d.c]);if(SY.has(d.c))await sync();audit('borrar '+d.c);R()},
- ncode:async d=>{const x=C.classes.find(c=>c.id===d.id);if(FB)await FB.fs.deleteDoc(FB.fs.doc(FB.db,'codes',x.code)).catch(()=>{});x.code=rnd(8);await st.put('classes',x);await sync();audit('código reiniciado');R()},
+ mdel:async d=>{if(!confirm('¿Borrar este elemento?'))return;try{await st.del(d.c,d.id);await load([d.c]);audit('borrar '+d.c)}catch(e){return fail(e)}R()},
+ ncode:async d=>{const x=C.classes.find(c=>c.id===d.id);x.code=rnd(8);try{await st.put('classes',x);audit('código reiniciado')}catch(e){return fail(e)}R()},
  gen,prev:()=>{pv=pv?0:1;R()},print:()=>window.print(),
  popen:d=>{cur=C.plans.find(p=>p.id===d.id);pe=null;R()},
- pdelplan:async d=>{if(!confirm('¿Borrar esta planificación?'))return;await st.del('plans',d.id);if(cur?.id===d.id)cur=null;await load(['plans']);R()},
+ pdelplan:async d=>{if(!confirm('¿Borrar esta planificación?'))return;try{await st.del('plans',d.id);if(cur?.id===d.id)cur=null;await load(['plans'])}catch(e){return fail(e)}R()},
  pen:d=>{pe={k:d.k,i:+d.i};R()},
  padd:d=>{cur.secs[d.k].push('');pe={k:d.k,i:cur.secs[d.k].length-1};R()},
  pdel:async d=>{if(!confirm('¿Borrar este ítem?'))return;cur.secs[d.k].splice(+d.i,1);pe=null;await persist()},
@@ -302,19 +317,19 @@ const A={
  dl:()=>{const a=document.createElement('a'),u=URL.createObjectURL(new Blob([$('#tx').value],{type:'text/plain'}));a.href=u;a.download='texto.txt';a.click();setTimeout(()=>URL.revokeObjectURL(u),1e3)},
  pdf:()=>{$('#out').innerHTML=md($('#tx').value);window.print()},
  comp,
- fbsave:async()=>{try{const s=$('#fbc').value,j=JSON.parse(s.slice(s.indexOf('{'),s.lastIndexOf('}')+1).replace(/([{,]\s*)(\w+)\s*:/g,'$1"$2":').replace(/'/g,'"').replace(/,\s*}/g,'}'));
-   if(!j.apiKey||!j.projectId||!j.appId)throw Error('Faltan apiKey, projectId o appId');localStorage.setItem('enp_fb',JSON.stringify(j));await connect();me=null;C={};R();toast(FB?'Conectado. Registrate o ingresá.':'No se pudo conectar.')}catch(e){toast('Configuración inválida: '+e.message)}},
- fbdrop:async()=>{localStorage.removeItem('enp_fb');FB=null;me=null;R();toast('Modo local activado.')},
+ sbsave:async()=>{const url=val('sbu'),key=val('sbk');
+   try{const u=new URL(url);if(u.protocol!=='https:')throw Error('La URL debe ser https');if(!key)throw Error('Falta la clave');if(secretKey(key))throw Error('Esa es una clave SECRETA; no la uses en el navegador');
+     localStorage.setItem('enp_sb',JSON.stringify({url:u.origin,key}));await connect();me=null;C={};R();toast(SB?'Conectado. Registrate o ingresá.':'No se pudo conectar.')}catch(e){toast('Configuración inválida: '+e.message)}},
+ sbdrop:()=>{localStorage.removeItem('enp_sb');SB=null;me=null;R();toast('Modo local activado.')},
  kuse:()=>{const k=val('gk');if(k)GK=k;const m=val('gm');if(/^[\w.\-]+$/.test(m))localStorage.setItem('enp_model',JSON.stringify(m));R();toast(GK?'Clave activa en esta sesión.':'Pegá una clave.')},
  kseal:async()=>{const k=val('gk')||GK,p=val('gp');if(!k||p.length<8)return toast('Necesitás la clave y una frase de 8+ caracteres.');localStorage.setItem('enp_k',JSON.stringify(await seal(k,p)));GK=k;R();toast('Clave guardada cifrada.')},
  kopen:async()=>{try{GK=await unseal(LS('enp_k'),val('gp'));R();toast('Clave desbloqueada.')}catch{toast('Frase incorrecta o no hay clave guardada.')}},
- kdrop:()=>{GK='';localStorage.removeItem('enp_k');R();toast('Clave eliminada.')},
- copy:()=>navigator.clipboard.writeText(RULES).then(()=>toast('Reglas copiadas.'))
+ kdrop:()=>{GK='';localStorage.removeItem('enp_k');R();toast('Clave eliminada.')}
 };
 const CH={
  theme:e=>document.documentElement.style.setProperty('--a',e.value),
  rol:e=>{$('#alw').hidden=e.value!=='padre'},
- role:async e=>{const u=C.users.find(x=>x.id===e.dataset.id);if(u.id===me.id){e.value=u.role;return toast('No podés cambiar tu propio rol.')}u.role=e.value;await st.put('users',u).catch(x=>toast('Sin permiso: '+x.code));audit('rol '+u.email+' → '+u.role)}
+ role:async e=>{const u=C.users.find(x=>x.id===e.dataset.id);if(u.id===me.id){e.value=u.role;return toast('No podés cambiar tu propio rol.')}u.role=e.value;try{await st.put('users',u);audit('rol '+u.email+' → '+u.role)}catch(x){fail(x)}}
 };
 document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b&&A[b.dataset.a])A[b.dataset.a](b.dataset)});
 document.addEventListener('change',e=>{const b=e.target.closest('[data-ch]');if(b&&CH[b.dataset.ch])CH[b.dataset.ch](b)});
@@ -346,7 +361,7 @@ setInterval(tick,1000);
 /* ================= Inicio ================= */
 (async()=>{
   await connect();
-  if(me&&isT()){try{if(FB&&!FB.auth.currentUser)await new Promise(r=>FB.au.onAuthStateChanged(FB.auth,r));if(FB&&!FB.auth.currentUser)throw 0;await load();bump()}catch{me=null}}
+  if(me&&isT()){try{if(SB){const {data}=await SB.auth.getSession();if(!data.session)throw 0}await load();bump()}catch{me=null}}
   R();
 })();
 </script>

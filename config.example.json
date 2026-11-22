@@ -1,0 +1,7 @@
+{
+  "supabase": {
+    "url": "https://TU-PROYECTO.supabase.co",
+    "key": "sb_publishable_XXXXXXXXXXXXXXXX"
+  },
+  "aiProxy": "https://eduplannet-ia.TU-CUENTA.workers.dev"
+}
